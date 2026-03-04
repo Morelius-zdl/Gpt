@@ -1,25 +1,26 @@
 const WIDTH = 16;
 const HEIGHT = 12;
 const VISION_RADIUS = 4;
-const TERRAIN_TYPES = ["meadow", "forest", "cave"];
 
 const ENEMIES = [
-  { name: "Wolf", emoji: "🐺", hp: 8, dmg: 3, xp: 3, glyph: "wolf" },
-  { name: "Hawk", emoji: "🦅", hp: 6, dmg: 2, xp: 2, glyph: "hawk" },
-  { name: "Snake", emoji: "🐍", hp: 5, dmg: 2, xp: 2, glyph: "snake" },
-  { name: "Bear", emoji: "🐻", hp: 14, dmg: 4, xp: 5, glyph: "bear" }
+  { name: "Wolf", emoji: "🐺", hp: 8, dmg: 3, xp: 3 },
+  { name: "Hawk", emoji: "🦅", hp: 6, dmg: 2, xp: 2 },
+  { name: "Snake", emoji: "🐍", hp: 5, dmg: 2, xp: 2 },
+  { name: "Bear", emoji: "🐻", hp: 14, dmg: 4, xp: 5 }
 ];
 
 const FORAGE = [
-  { name: "Berries", emoji: "🫐", heal: 3, terrain: ["meadow", "forest"] },
+  { name: "Berries", emoji: "🍓", heal: 3, terrain: ["meadow", "forest"] },
   { name: "Mushroom", emoji: "🍄", heal: 4, terrain: ["forest", "cave"] },
-  { name: "Fish", emoji: "🐟", heal: 5, terrain: ["river"] }
+  { name: "Fish", emoji: "🐟", heal: 5, terrain: ["river"] },
+  { name: "Nuts", emoji: "🌰", heal: 2, terrain: ["forest", "meadow"] }
 ];
 
 const ABILITIES = {
   swiftPaws: { name: "Swift Paws", desc: "20% chance each turn to gain one free extra step." },
   thickFur: { name: "Thick Fur", desc: "Reduce incoming damage by 1 (minimum 1)." },
-  keenNose: { name: "Keen Nose", desc: "Sense forage up to 5 tiles away and reveal extra map radius." }
+  keenNose: { name: "Keen Nose", desc: "Reveal all forage locations on the map." },
+  forestHeart: { name: "Forest Heart", desc: "Regenerate 1 HP after enemies finish their turn." }
 };
 
 const state = {
@@ -31,6 +32,7 @@ const state = {
   player: null,
   enemies: [],
   items: [],
+  exit: null,
   log: [],
   gameOver: false,
   levelModalOpen: false,
@@ -48,6 +50,7 @@ const deathSummary = document.getElementById("deathSummary");
 function randInt(max) { return Math.floor(Math.random() * max); }
 function inBounds(x, y) { return x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT; }
 function distance(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
+function isBlocked(x, y) { return state.map[y][x] === "forest" || state.map[y][x] === "river"; }
 
 function addLog(text, cls = "") {
   state.log.unshift({ text, cls });
@@ -56,7 +59,7 @@ function addLog(text, cls = "") {
 
 function pickTerrain() {
   const roll = Math.random();
-  if (roll < 0.45) return "forest";
+  if (roll < 0.3) return "forest";
   if (roll < 0.8) return "meadow";
   return "cave";
 }
@@ -67,23 +70,22 @@ function generateMap() {
 
   let riverX = randInt(WIDTH);
   for (let y = 0; y < HEIGHT; y += 1) {
-    for (let w = -1; w <= 1; w += 1) {
-      const x = riverX + w;
-      if (x >= 0 && x < WIDTH) state.map[y][x] = "river";
-    }
+    const x = riverX;
+    if (x >= 0 && x < WIDTH) state.map[y][x] = "river";
     riverX += randInt(3) - 1;
     riverX = Math.max(1, Math.min(WIDTH - 2, riverX));
   }
 }
 
-function randomOpenTile(preferNonRiver = false) {
-  for (let i = 0; i < 200; i += 1) {
+function randomOpenTile(preferNonBlocked = false) {
+  for (let i = 0; i < 300; i += 1) {
     const p = { x: randInt(WIDTH), y: randInt(HEIGHT) };
     const occupied = state.enemies.some((e) => e.x === p.x && e.y === p.y)
       || state.items.some((it) => it.x === p.x && it.y === p.y)
+      || (state.exit && state.exit.x === p.x && state.exit.y === p.y)
       || (state.player && state.player.x === p.x && state.player.y === p.y);
     if (occupied) continue;
-    if (preferNonRiver && state.map[p.y][p.x] === "river") continue;
+    if (preferNonBlocked && isBlocked(p.x, p.y)) continue;
     return p;
   }
   return { x: 0, y: 0 };
@@ -97,12 +99,7 @@ function spawnEntities() {
   for (let i = 0; i < enemyCount; i += 1) {
     const base = ENEMIES[Math.min(ENEMIES.length - 1, randInt(ENEMIES.length + Math.floor(state.floor / 3))) % ENEMIES.length];
     const pos = randomOpenTile(true);
-    state.enemies.push({
-      ...base,
-      hp: base.hp + Math.floor(state.floor / 2),
-      x: pos.x,
-      y: pos.y
-    });
+    state.enemies.push({ ...base, hp: base.hp + Math.floor(state.floor / 2), x: pos.x, y: pos.y });
   }
 
   const itemCount = 6 + state.floor;
@@ -113,6 +110,8 @@ function spawnEntities() {
     const item = candidates.length ? candidates[randInt(candidates.length)] : FORAGE[0];
     state.items.push({ ...item, x: pos.x, y: pos.y });
   }
+
+  state.exit = randomOpenTile(true);
 }
 
 function startNewRun() {
@@ -136,6 +135,9 @@ function startNewRun() {
   state.log = [];
   addLog("A new run begins. You are a nimble fox in unknown wilderness.", "good");
   generateMap();
+  const start = randomOpenTile(true);
+  state.player.x = start.x;
+  state.player.y = start.y;
   spawnEntities();
   render();
 }
@@ -144,20 +146,13 @@ function revealVisible() {
   const radius = state.player.abilities.includes("keenNose") ? VISION_RADIUS + 1 : VISION_RADIUS;
   for (let y = 0; y < HEIGHT; y += 1) {
     for (let x = 0; x < WIDTH; x += 1) {
-      if (Math.abs(x - state.player.x) + Math.abs(y - state.player.y) <= radius) {
-        state.visited[y][x] = true;
-      }
+      if (Math.abs(x - state.player.x) + Math.abs(y - state.player.y) <= radius) state.visited[y][x] = true;
     }
   }
 }
 
-function enemyAt(x, y) {
-  return state.enemies.find((e) => e.x === x && e.y === y);
-}
-
-function itemAt(x, y) {
-  return state.items.find((it) => it.x === x && it.y === y);
-}
+function enemyAt(x, y) { return state.enemies.find((e) => e.x === x && e.y === y); }
+function itemAt(x, y) { return state.items.find((it) => it.x === x && it.y === y); }
 
 function takeDamage(amount, source) {
   const reduced = state.player.abilities.includes("thickFur") ? Math.max(1, amount - 1) : amount;
@@ -199,11 +194,10 @@ function collectItem(item) {
   addLog(`You forage ${item.emoji} ${item.name} and heal ${item.heal}.`, "good");
 }
 
-function maybeAdvanceFloor() {
-  if (state.enemies.length > 0) return;
+function descendFloor() {
   state.floor += 1;
   state.score += 5;
-  addLog(`🌲 You push deeper into the wild. Entering floor ${state.floor}.`, "good");
+  addLog(`🕳️ You slip into a deeper zone. Entering floor ${state.floor}.`, "good");
   generateMap();
   const pos = randomOpenTile(true);
   state.player.x = pos.x;
@@ -224,6 +218,11 @@ function handlePlayerAction(dx, dy) {
       render();
       return;
     }
+    if (isBlocked(nx, ny)) {
+      addLog(state.map[ny][nx] === "river" ? "🌊 Water blocks your path." : "🌲 Trees block your path.");
+      render();
+      return;
+    }
 
     const targetEnemy = enemyAt(nx, ny);
     if (targetEnemy) {
@@ -233,6 +232,11 @@ function handlePlayerAction(dx, dy) {
       state.player.y = ny;
       const pickup = itemAt(nx, ny);
       if (pickup) collectItem(pickup);
+      if (state.exit.x === nx && state.exit.y === ny) {
+        descendFloor();
+        render();
+        return;
+      }
     }
   }
 
@@ -248,7 +252,10 @@ function handlePlayerAction(dx, dy) {
   } else {
     state.freeStep = false;
     enemyTurn();
-    maybeAdvanceFloor();
+    if (state.player.abilities.includes("forestHeart") && !state.gameOver && state.player.hp < state.player.maxHp) {
+      state.player.hp += 1;
+      addLog("💚 Forest Heart restores 1 HP.", "good");
+    }
   }
 
   render();
@@ -280,12 +287,13 @@ function enemyTurn() {
 
     const tx = enemy.x + dx;
     const ty = enemy.y + dy;
-    if (!inBounds(tx, ty)) continue;
+    if (!inBounds(tx, ty) || isBlocked(tx, ty)) continue;
     if (tx === state.player.x && ty === state.player.y) {
       takeDamage(enemy.dmg + Math.floor(state.floor / 3), enemy.name);
       continue;
     }
     if (enemyAt(tx, ty)) continue;
+    if (state.exit.x === tx && state.exit.y === ty) continue;
     enemy.x = tx;
     enemy.y = ty;
   }
@@ -337,20 +345,8 @@ function endRun() {
   deathModal.classList.remove("hidden");
 }
 
-function directionToNearestItem() {
-  if (!state.player.abilities.includes("keenNose")) return "None";
-  let nearest = null;
-  for (const item of state.items) {
-    const d = distance(item, state.player);
-    if (d > 5) continue;
-    if (!nearest || d < nearest.d) nearest = { item, d };
-  }
-  if (!nearest) return "No scent nearby";
-  const dx = nearest.item.x - state.player.x;
-  const dy = nearest.item.y - state.player.y;
-  const h = dx === 0 ? "" : dx > 0 ? "E" : "W";
-  const v = dy === 0 ? "" : dy > 0 ? "S" : "N";
-  return `${v}${h || ""} (${nearest.d})`;
+function nearbyItemsCount() {
+  return state.items.filter((item) => distance(item, state.player) <= 3).length;
 }
 
 function render() {
@@ -368,9 +364,11 @@ function render() {
       if (visible) {
         const enemy = enemyAt(x, y);
         const item = itemAt(x, y);
+        const revealItem = state.player.abilities.includes("keenNose") || visible;
         if (state.player.x === x && state.player.y === y) tile.textContent = state.player.emoji;
         else if (enemy) tile.textContent = enemy.emoji;
-        else if (item) tile.textContent = item.emoji;
+        else if (item && revealItem) tile.textContent = item.emoji;
+        else if (state.exit.x === x && state.exit.y === y) tile.textContent = "🕳️";
         else tile.textContent = terrain === "forest" ? "🌲" : terrain === "meadow" ? "🌿" : terrain === "river" ? "🌊" : "🪨";
       } else if (state.visited[y][x]) {
         tile.textContent = "·";
@@ -388,8 +386,8 @@ function render() {
     <li>Score: ${state.score}</li>
     <li>High Score: ${state.highScore}</li>
     <li>Level: ${state.player.level} (${state.player.xp}/${state.player.xpToNext} XP)</li>
+    <li>Nearby forage (≤3): ${nearbyItemsCount()}</li>
     <li>Abilities: ${abilities}</li>
-    <li>Keen Nose: ${directionToNearestItem()}</li>
     <li>${state.freeStep ? "⚡ Extra step ready" : ""}</li>
   `;
 

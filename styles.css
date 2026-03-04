@@ -69,6 +69,13 @@ h1 { margin: 0 0 0.25rem; }
   gap: 0.35rem;
 }
 
+.help {
+  margin: 0.25rem 0 0.75rem;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
 #log {
   margin-top: 0.5rem;
   background: #0f1f14;
