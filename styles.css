@@ -132,6 +132,30 @@ button:hover { background: #31613f; }
   padding: 0.8rem;
 }
 
+
+
+.dpad {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(3, 54px);
+  grid-template-areas:
+    ". up ."
+    "left down right";
+  gap: 0.4rem;
+  justify-content: center;
+}
+
+.dpad-btn {
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 0.5rem;
+  touch-action: manipulation;
+}
+
+#moveUp { grid-area: up; }
+#moveLeft { grid-area: left; }
+#moveDown { grid-area: down; }
+#moveRight { grid-area: right; }
 @media (max-width: 980px) {
   .layout { grid-template-columns: 1fr; }
 }

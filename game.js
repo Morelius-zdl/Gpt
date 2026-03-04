@@ -404,14 +404,45 @@ document.getElementById("restartBtn").addEventListener("click", () => {
   startNewRun();
 });
 
+function bindPress(id, dx, dy) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const trigger = (event) => {
+    event.preventDefault();
+    handlePlayerAction(dx, dy);
+  };
+  el.addEventListener("click", trigger);
+  el.addEventListener("touchstart", trigger, { passive: false });
+}
+
+bindPress("moveUp", 0, -1);
+bindPress("moveLeft", -1, 0);
+bindPress("moveDown", 0, 1);
+bindPress("moveRight", 1, 0);
+
 window.addEventListener("keydown", (event) => {
   if (state.gameOver || state.levelModalOpen) return;
   const key = event.key.toLowerCase();
-  if (["arrowup", "w"].includes(key)) return handlePlayerAction(0, -1);
-  if (["arrowdown", "s"].includes(key)) return handlePlayerAction(0, 1);
-  if (["arrowleft", "a"].includes(key)) return handlePlayerAction(-1, 0);
-  if (["arrowright", "d"].includes(key)) return handlePlayerAction(1, 0);
-  if (key === " ") return handlePlayerAction(0, 0);
+  if (["arrowup", "w"].includes(key)) {
+    event.preventDefault();
+    return handlePlayerAction(0, -1);
+  }
+  if (["arrowdown", "s"].includes(key)) {
+    event.preventDefault();
+    return handlePlayerAction(0, 1);
+  }
+  if (["arrowleft", "a"].includes(key)) {
+    event.preventDefault();
+    return handlePlayerAction(-1, 0);
+  }
+  if (["arrowright", "d"].includes(key)) {
+    event.preventDefault();
+    return handlePlayerAction(1, 0);
+  }
+  if (key === " ") {
+    event.preventDefault();
+    return handlePlayerAction(0, 0);
+  }
 });
 
 startNewRun();
