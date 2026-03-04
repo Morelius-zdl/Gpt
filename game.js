@@ -77,6 +77,38 @@ function generateMap() {
   }
 }
 
+function walkableNeighborsCount(x, y) {
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  let count = 0;
+  for (const [dx, dy] of dirs) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (inBounds(nx, ny) && !isBlocked(nx, ny)) count += 1;
+  }
+  return count;
+}
+
+function openAdjacentTile(x, y) {
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]].sort(() => Math.random() - 0.5);
+  for (const [dx, dy] of dirs) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (!inBounds(nx, ny)) continue;
+    state.map[ny][nx] = "meadow";
+    return;
+  }
+}
+
+function randomWalkableTile() {
+  for (let i = 0; i < 250; i += 1) {
+    const p = randomOpenTile(true);
+    if (walkableNeighborsCount(p.x, p.y) > 0) return p;
+  }
+  const fallback = randomOpenTile(true);
+  if (walkableNeighborsCount(fallback.x, fallback.y) === 0) openAdjacentTile(fallback.x, fallback.y);
+  return fallback;
+}
+
 function randomOpenTile(preferNonBlocked = false) {
   for (let i = 0; i < 300; i += 1) {
     const p = { x: randInt(WIDTH), y: randInt(HEIGHT) };
@@ -98,7 +130,7 @@ function spawnEntities() {
   const enemyCount = 4 + state.floor;
   for (let i = 0; i < enemyCount; i += 1) {
     const base = ENEMIES[Math.min(ENEMIES.length - 1, randInt(ENEMIES.length + Math.floor(state.floor / 3))) % ENEMIES.length];
-    const pos = randomOpenTile(true);
+    const pos = randomWalkableTile();
     state.enemies.push({ ...base, hp: base.hp + Math.floor(state.floor / 2), x: pos.x, y: pos.y });
   }
 
@@ -111,7 +143,7 @@ function spawnEntities() {
     state.items.push({ ...item, x: pos.x, y: pos.y });
   }
 
-  state.exit = randomOpenTile(true);
+  state.exit = randomWalkableTile();
 }
 
 function startNewRun() {
@@ -134,8 +166,9 @@ function startNewRun() {
   };
   state.log = [];
   addLog("A new run begins. You are a nimble fox in unknown wilderness.", "good");
+  addLog("Tip: use the on-screen arrow buttons if keyboard input is blocked in preview.");
   generateMap();
-  const start = randomOpenTile(true);
+  const start = randomWalkableTile();
   state.player.x = start.x;
   state.player.y = start.y;
   spawnEntities();
@@ -199,7 +232,7 @@ function descendFloor() {
   state.score += 5;
   addLog(`🕳️ You slip into a deeper zone. Entering floor ${state.floor}.`, "good");
   generateMap();
-  const pos = randomOpenTile(true);
+  const pos = randomWalkableTile();
   state.player.x = pos.x;
   state.player.y = pos.y;
   spawnEntities();
